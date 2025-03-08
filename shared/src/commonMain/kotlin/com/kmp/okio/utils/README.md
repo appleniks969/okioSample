@@ -1,57 +1,118 @@
-# OkioUtils Structure and KMM Best Practices
+# OkioUtils
 
-This package contains utilities for using Okio in a Kotlin Multiplatform project. The code has been structured according to KMM best practices to ensure proper separation of concerns and platform-specific implementations.
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Android%20|%20iOS-lightgrey.svg)](https://kotlinlang.org/docs/multiplatform.html)
 
-## Architecture
+A Kotlin Multiplatform library providing cross-platform file operations, serialization utilities, and ZIP functionality using Square's [Okio](https://square.github.io/okio/) library.
 
-### Interface-based Platform Implementation
+## Features
 
-We've adopted an interface-based approach for platform-specific functionality:
+- **Cross-Platform File Operations**: Read, write, copy, delete, and list files with a consistent API
+- **Platform-Specific Directory Access**: Get cache, files, and temp directories on iOS and Android
+- **Serialization Utilities**: Easily serialize strings, lists, maps, and binary data
+- **ZIP Functionality**: Compress and decompress files with the same API on all platforms
+- **Modern Architecture**: Interface-based design with clean separation of platform-specific code
 
-1. **PlatformFile Interface**: Defines the contract for platform-specific file operations
-   - Provides consistent API across platforms
-   - Makes platform-specific requirements explicit
+## Installation
 
-2. **AndroidPlatformFile**: Implements the interface for Android
-   - Uses Android Context for directory access
-   - Implements compression using java.util.zip
+### Gradle
 
-3. **IosPlatformFile**: Implements the interface for iOS
-   - Uses NSSearchPathForDirectoriesInDomains for directory access
-   - Implements compression using a bridge to native iOS code
+Add the dependency to your module's `build.gradle.kts` file:
 
-### Pure Kotlin Common Code
+```kotlin
+repositories {
+    mavenCentral()
+}
 
-1. **FileOperations.kt**: Platform-agnostic file operations
-   - Read, write, copy, list, and delete files
-   - Works with the abstract FileSystem from Okio
+// For common code
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation("com.kmp.okio:okio-utils:1.0.0")
+            }
+        }
+    }
+}
 
-2. **OkioUtils.kt**: Serialization utilities and platform-independent API
-   - Extension functions for BufferedSink and BufferedSource
-   - Delegates to platform-specific implementations where needed
+// For JVM/Android only
+dependencies {
+    implementation("com.kmp.okio:okio-utils-android:1.0.0")
+}
+```
 
-## KMM Best Practices Applied
+### Cocoapods
 
-1. **Consistent Error Handling**
-   - Transformed platform-specific exceptions to generic exceptions
-   - Provides helpful context in error messages
+Add the pod to your `Podfile`:
 
-2. **Dependency Injection**
-   - Platform-specific implementations are provided via singletons
-   - Makes testing easier with mock implementations
+```ruby
+pod 'OkioUtils', '~> 1.0.0'
+```
 
-3. **Improved Testability**
-   - FakeFileSystem for testing file operations
-   - Mock implementations for platform-specific code
+## Usage
 
-4. **Clear API Boundaries**
-   - Separated serialization from file operations
-   - Platform-specific code is well-encapsulated
+### File Operations
 
-5. **Documentation**
-   - KDoc comments for all public APIs
-   - Clear explanations of functionality and error conditions
+```kotlin
+val file = FileSystem.SYSTEM.getPath("/path/to/file")
 
-6. **Simplified Usage**
-   - Top-level functions for common operations
-   - Type-safe Builder pattern via Kotlin extension functions 
+// Read file
+val content = file.readText()
+
+// Write file
+file.writeText("Hello, World!")
+
+// Copy file
+val destination = FileSystem.SYSTEM.getPath("/path/to/destination")
+file.copyTo(destination)
+
+// Delete file
+file.delete()
+
+// List files in a directory
+val directory = FileSystem.SYSTEM.getPath("/path/to/directory")
+val files = directory.listFiles()
+```
+
+### Serialization Utilities
+
+```kotlin
+val data = mapOf("key" to "value")
+
+// Serialize to JSON
+val json = data.toJson()
+
+// Deserialize from JSON
+val deserializedData = json.fromJson<Map<String, String>>()
+```
+
+### ZIP Functionality
+
+```kotlin
+val source = FileSystem.SYSTEM.getPath("/path/to/source")
+val destination = FileSystem.SYSTEM.getPath("/path/to/destination")
+
+// Compress file or directory
+source.compress(destination)
+
+// Decompress file
+destination.decompress(source)
+```
+
+## API Documentation
+
+For detailed API documentation, please refer to the [KDoc](https://kotlinlang.org/docs/kotlin-doc.html) comments in the source code.
+
+## Platform-Specific Details
+
+- **Android**: Uses Android Context for directory access and Java's `java.util.zip` for compression
+- **iOS**: Uses NSSearchPathForDirectoriesInDomains for directory access and a bridge to native iOS code for compression
+
+## Contributing
+
+Contributions are welcome! Please follow the [Contributing Guidelines](CONTRIBUTING.md) for more information.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
