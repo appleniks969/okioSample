@@ -3,9 +3,56 @@ package com.kmp.okio.utils
 import okio.ByteString
 import okio.FileSystem
 import okio.Path
+import okio.IOException
 import kotlin.random.Random
 
 // ==================== File System Operations ====================
+
+/**
+ * Represents the result of a file operation that might fail.
+ */
+sealed class FileResult<out T> {
+    /**
+     * Represents a successful file operation.
+     */
+    data class Success<T>(val value: T) : FileResult<T>()
+    
+    /**
+     * Represents a failed file operation.
+     */
+    data class Error(val exception: Exception) : FileResult<Nothing>()
+    
+    /**
+     * Returns the value if this is a [Success], or null if this is an [Error].
+     */
+    fun getOrNull(): T? = when (this) {
+        is Success -> value
+        is Error -> null
+    }
+    
+    /**
+     * Returns the value if this is a [Success], or throws the exception if this is an [Error].
+     */
+    fun getOrThrow(): T = when (this) {
+        is Success -> value
+        is Error -> throw exception
+    }
+    
+    /**
+     * Returns true if this is a [Success].
+     */
+    val isSuccess: Boolean get() = this is Success
+    
+    /**
+     * Returns true if this is an [Error].
+     */
+    val isError: Boolean get() = this is Error
+}
+
+/**
+ * Exception thrown when a file operation fails.
+ */
+class FileOperationException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /**
  * Writes the given [content] to a file at [path], creating parent directories if needed.
@@ -13,14 +60,20 @@ import kotlin.random.Random
  * @param path The path to the file.
  * @param content The string content to write.
  * @param createParentDirectories Whether to create parent directories if they don't exist.
+ * @return A [FileResult] indicating success or failure.
  */
-fun writeToFile(path: Path, content: String, createParentDirectories: Boolean = true) {
-    if (createParentDirectories) {
-        path.parent?.let { fileSystem.createDirectories(it) }
-    }
-    
-    fileSystem.write(path) {
-        writeUtf8(content)
+fun writeToFile(path: Path, content: String, createParentDirectories: Boolean = true): FileResult<Unit> {
+    return try {
+        if (createParentDirectories) {
+            path.parent?.let { fileSystem.createDirectories(it) }
+        }
+        
+        fileSystem.write(path) {
+            writeUtf8(content)
+        }
+        FileResult.Success(Unit)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to write to file: $path", e))
     }
 }
 
@@ -30,14 +83,20 @@ fun writeToFile(path: Path, content: String, createParentDirectories: Boolean = 
  * @param path The path to the file.
  * @param byteString The binary content to write.
  * @param createParentDirectories Whether to create parent directories if they don't exist.
+ * @return A [FileResult] indicating success or failure.
  */
-fun writeToFile(path: Path, byteString: ByteString, createParentDirectories: Boolean = true) {
-    if (createParentDirectories) {
-        path.parent?.let { fileSystem.createDirectories(it) }
-    }
-    
-    fileSystem.write(path) {
-        write(byteString)
+fun writeToFile(path: Path, byteString: ByteString, createParentDirectories: Boolean = true): FileResult<Unit> {
+    return try {
+        if (createParentDirectories) {
+            path.parent?.let { fileSystem.createDirectories(it) }
+        }
+        
+        fileSystem.write(path) {
+            write(byteString)
+        }
+        FileResult.Success(Unit)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to write binary data to file: $path", e))
     }
 }
 
@@ -45,16 +104,20 @@ fun writeToFile(path: Path, byteString: ByteString, createParentDirectories: Boo
  * Reads the content from a file at [path] as a string.
  *
  * @param path The path to the file.
- * @return The string content of the file.
- * @throws Exception If the file does not exist.
+ * @return A [FileResult] containing the string content or an error.
  */
-fun readFromFile(path: Path): String {
-    if (!fileSystem.exists(path)) {
-        throw Exception("File does not exist: $path")
-    }
-    
-    return fileSystem.read(path) {
-        readUtf8()
+fun readFromFile(path: Path): FileResult<String> {
+    return try {
+        if (!fileSystem.exists(path)) {
+            return FileResult.Error(FileOperationException("File does not exist: $path"))
+        }
+        
+        val content = fileSystem.read(path) {
+            readUtf8()
+        }
+        FileResult.Success(content)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to read from file: $path", e))
     }
 }
 
@@ -62,16 +125,20 @@ fun readFromFile(path: Path): String {
  * Reads the content from a file at [path] as a ByteString.
  *
  * @param path The path to the file.
- * @return The binary content of the file.
- * @throws Exception If the file does not exist.
+ * @return A [FileResult] containing the binary content or an error.
  */
-fun readBytesFromFile(path: Path): ByteString {
-    if (!fileSystem.exists(path)) {
-        throw Exception("File does not exist: $path")
-    }
-    
-    return fileSystem.read(path) {
-        readByteString()
+fun readBytesFromFile(path: Path): FileResult<ByteString> {
+    return try {
+        if (!fileSystem.exists(path)) {
+            return FileResult.Error(FileOperationException("File does not exist: $path"))
+        }
+        
+        val content = fileSystem.read(path) {
+            readByteString()
+        }
+        FileResult.Success(content)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to read bytes from file: $path", e))
     }
 }
 
@@ -91,19 +158,28 @@ fun fileExists(path: Path): Boolean {
  *
  * @param path The path to the file or directory.
  * @param recursively Whether to delete directories recursively.
+ * @return A [FileResult] indicating success or failure.
  */
-fun delete(path: Path, recursively: Boolean = false) {
-    if (!fileSystem.exists(path)) {
-        return // Nothing to delete
-    }
-    
-    if (recursively && fileSystem.metadata(path).isDirectory) {
-        fileSystem.list(path).forEach { childPath ->
-            delete(childPath, true)
+fun delete(path: Path, recursively: Boolean = false): FileResult<Unit> {
+    return try {
+        if (!fileSystem.exists(path)) {
+            return FileResult.Success(Unit) // Nothing to delete
         }
+        
+        if (recursively && fileSystem.metadata(path).isDirectory) {
+            fileSystem.list(path).forEach { childPath ->
+                val result = delete(childPath, true)
+                if (result.isError) {
+                    return result
+                }
+            }
+        }
+        
+        fileSystem.delete(path)
+        FileResult.Success(Unit)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to delete: $path", e))
     }
-    
-    fileSystem.delete(path)
 }
 
 /**
@@ -112,50 +188,64 @@ fun delete(path: Path, recursively: Boolean = false) {
  * @param source The path to the source file.
  * @param destination The path to the destination file.
  * @param createParentDirectories Whether to create parent directories for the destination.
- * @throws Exception If the source file doesn't exist or is a directory.
+ * @return A [FileResult] indicating success or failure.
  */
-fun copyFile(source: Path, destination: Path, createParentDirectories: Boolean = true) {
-    if (!fileSystem.exists(source)) {
-        throw Exception("Source file doesn't exist: $source")
+fun copyFile(source: Path, destination: Path, createParentDirectories: Boolean = true): FileResult<Unit> {
+    return try {
+        if (!fileSystem.exists(source)) {
+            return FileResult.Error(FileOperationException("Source file doesn't exist: $source"))
+        }
+        
+        if (fileSystem.metadata(source).isDirectory) {
+            return FileResult.Error(FileOperationException("Source is a directory, not a file: $source"))
+        }
+        
+        if (createParentDirectories) {
+            destination.parent?.let { fileSystem.createDirectories(it) }
+        }
+        
+        fileSystem.copy(source, destination)
+        FileResult.Success(Unit)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to copy file from $source to $destination", e))
     }
-    
-    if (fileSystem.metadata(source).isDirectory) {
-        throw Exception("Source is a directory, not a file: $source")
-    }
-    
-    if (createParentDirectories) {
-        destination.parent?.let { fileSystem.createDirectories(it) }
-    }
-    
-    fileSystem.copy(source, destination)
 }
 
 /**
  * Creates all directories in the path if they don't exist.
  *
  * @param path The directory path to create.
+ * @return A [FileResult] indicating success or failure.
  */
-fun createDirectories(path: Path) {
-    fileSystem.createDirectories(path)
+fun createDirectories(path: Path): FileResult<Unit> {
+    return try {
+        fileSystem.createDirectories(path)
+        FileResult.Success(Unit)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to create directories: $path", e))
+    }
 }
 
 /**
  * Lists all files and directories in the specified directory.
  *
  * @param directory The directory to list.
- * @return A list of paths for all entries in the directory.
- * @throws Exception If the directory doesn't exist or is not a directory.
+ * @return A [FileResult] containing a list of paths for all entries in the directory or an error.
  */
-fun listDirectory(directory: Path): List<Path> {
-    if (!fileSystem.exists(directory)) {
-        throw Exception("Directory doesn't exist: $directory")
+fun listDirectory(directory: Path): FileResult<List<Path>> {
+    return try {
+        if (!fileSystem.exists(directory)) {
+            return FileResult.Error(FileOperationException("Directory doesn't exist: $directory"))
+        }
+        
+        if (!fileSystem.metadata(directory).isDirectory) {
+            return FileResult.Error(FileOperationException("Path is not a directory: $directory"))
+        }
+        
+        FileResult.Success(fileSystem.list(directory))
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to list directory: $directory", e))
     }
-    
-    if (!fileSystem.metadata(directory).isDirectory) {
-        throw Exception("Path is not a directory: $directory")
-    }
-    
-    return fileSystem.list(directory)
 }
 
 /**
@@ -166,23 +256,29 @@ fun listDirectory(directory: Path): List<Path> {
  *                     If null, the first file in the extracted directory will be read.
  *                     If specified but not found, the function will try to search for the file by name only.
  * @param deleteAfterReading Whether to delete the extracted files after reading (default: true).
- * @return The string content of the file from the ZIP.
- * @throws Exception If the ZIP file doesn't exist, extraction fails, or the specified file cannot be found.
+ * @return A [FileResult] containing the string content of the file from the ZIP or an error.
  */
-fun readStringFromZip(zipPath: Path, filePathInZip: String? = null, deleteAfterReading: Boolean = true): String {
+fun readStringFromZip(zipPath: Path, filePathInZip: String? = null, deleteAfterReading: Boolean = true): FileResult<String> {
     if (!fileExists(zipPath)) {
-        throw Exception("ZIP file does not exist: $zipPath")
+        return FileResult.Error(FileOperationException("ZIP file does not exist: $zipPath"))
     }
     
     // Create a temporary directory for extraction with a random identifier
     val randomId = Random.nextInt(100000, 999999)
     val extractDir = getTempDirectory() / "extract_$randomId"
+    
     try {
         // Create the temporary directory
-        createDirectories(extractDir)
+        val createDirResult = createDirectories(extractDir)
+        if (createDirResult.isError) {
+            return FileResult.Error(FileOperationException("Failed to create temporary directory for ZIP extraction", (createDirResult as FileResult.Error).exception))
+        }
         
         // Extract the ZIP file
-        decompressZip(zipPath, extractDir)
+        val extractResult = decompressZip(zipPath, extractDir)
+        if (extractResult.isError) {
+            return FileResult.Error(FileOperationException("Failed to extract ZIP file", (extractResult as FileResult.Error).exception))
+        }
         
         // Find the file to read
         val fileToRead = if (filePathInZip != null) {
@@ -193,26 +289,41 @@ fun readStringFromZip(zipPath: Path, filePathInZip: String? = null, deleteAfterR
             } else {
                 // If not found, try to find the file by name anywhere in the extracted directory
                 val fileName = filePathInZip.substringAfterLast('/')
-                val allFiles = findAllFiles(extractDir)
+                val allFilesResult = findAllFiles(extractDir)
+                
+                if (allFilesResult.isError) {
+                    return FileResult.Error(FileOperationException("Failed to search for file in extracted ZIP", (allFilesResult as FileResult.Error).exception))
+                }
+                
+                val allFiles = allFilesResult.getOrThrow()
                 val matchingFile = allFiles.find { it.name == fileName }
                 
                 if (matchingFile != null) {
                     matchingFile
                 } else {
-                    throw Exception("File '$filePathInZip' not found in the ZIP archive")
+                    return FileResult.Error(FileOperationException("File '$filePathInZip' not found in the ZIP archive"))
                 }
             }
         } else {
             // Find the first file in the extracted directory
-            val allFiles = findAllFiles(extractDir)
-            if (allFiles.isEmpty()) {
-                throw Exception("No files found in the ZIP archive")
+            val allFilesResult = findAllFiles(extractDir)
+            
+            if (allFilesResult.isError) {
+                return FileResult.Error(FileOperationException("Failed to list files in extracted ZIP", (allFilesResult as FileResult.Error).exception))
             }
+            
+            val allFiles = allFilesResult.getOrThrow()
+            if (allFiles.isEmpty()) {
+                return FileResult.Error(FileOperationException("No files found in the ZIP archive"))
+            }
+            
             allFiles.first()
         }
         
         // Read the file content
         return readFromFile(fileToRead)
+    } catch (e: Exception) {
+        return FileResult.Error(FileOperationException("Error processing ZIP file", e))
     } finally {
         // Clean up if requested
         if (deleteAfterReading) {
@@ -225,22 +336,35 @@ fun readStringFromZip(zipPath: Path, filePathInZip: String? = null, deleteAfterR
  * Recursively finds all files (not directories) within a directory.
  * 
  * @param directory The directory to search.
- * @return A list of paths to all files found.
+ * @return A [FileResult] containing a list of paths to all files found or an error.
  */
-private fun findAllFiles(directory: Path): List<Path> {
+private fun findAllFiles(directory: Path): FileResult<List<Path>> {
     if (!fileExists(directory) || !fileSystem.metadata(directory).isDirectory) {
-        return emptyList()
+        return FileResult.Success(emptyList())
     }
     
-    val result = mutableListOf<Path>()
-    for (path in listDirectory(directory)) {
-        val metadata = fileSystem.metadata(path)
-        if (metadata.isDirectory) {
-            result.addAll(findAllFiles(path))
-        } else {
-            result.add(path)
+    return try {
+        val directoryListResult = listDirectory(directory)
+        if (directoryListResult.isError) {
+            return directoryListResult
         }
+        
+        val result = mutableListOf<Path>()
+        for (path in directoryListResult.getOrThrow()) {
+            val metadata = fileSystem.metadata(path)
+            if (metadata.isDirectory) {
+                val subDirResult = findAllFiles(path)
+                if (subDirResult.isError) {
+                    return subDirResult
+                }
+                result.addAll(subDirResult.getOrThrow())
+            } else {
+                result.add(path)
+            }
+        }
+        
+        FileResult.Success(result)
+    } catch (e: Exception) {
+        FileResult.Error(FileOperationException("Failed to find files in directory: $directory", e))
     }
-    
-    return result
 } 

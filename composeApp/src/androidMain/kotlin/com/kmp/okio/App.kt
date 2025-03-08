@@ -50,266 +50,390 @@ fun App() {
         ) { paddingValues ->
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
                     .padding(paddingValues)
                     .padding(16.dp)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    "Okio File Operations",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Image(
+                    painterResource(Res.drawable.compose_multiplatform),
+                    null,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
                 
-                // Main Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                operationResults = emptyList()
-                                val results = runFileOperationsDemo()
-                                operationResults = results
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Run Demo")
-                    }
-                    
-                    Button(
-                        onClick = {
-                            operationResults = emptyList()
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color.LightGray)
-                    ) {
-                        Text("Clear")
-                    }
-                }
-                
-                // Results
-                if (operationResults.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = 4.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                        ) {
-                            Text(
-                                "Operation Results",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            
-                            Divider()
-                            
-                            operationResults.forEach { result ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (result.success) Icons.Default.Check else Icons.Default.Close,
-                                        contentDescription = if (result.success) "Success" else "Error",
-                                        tint = if (result.success) Color.Green else Color.Red,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    
-                                    Column(
-                                        modifier = Modifier
-                                            .padding(start = 16.dp)
-                                            .weight(1f)
-                                    ) {
-                                        Text(
-                                            result.operation,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            result.details,
-                                            fontSize = 14.sp,
-                                            color = Color.Gray
-                                        )
-                                    }
-                                }
-                                
-                                Divider()
-                            }
+                // File Operation Buttons
+                OperationButtonRow(
+                    title = "Basic File Operations",
+                    description = "Read, write, and delete files",
+                    onRunTests = {
+                        scope.launch {
+                            val results = runBasicFileOperations()
+                            operationResults = results + operationResults
                         }
                     }
+                )
+                
+                OperationButtonRow(
+                    title = "Directory Operations",
+                    description = "Create directories and list files",
+                    onRunTests = {
+                        scope.launch {
+                            val results = runDirectoryOperations()
+                            operationResults = results + operationResults
+                        }
+                    }
+                )
+                
+                OperationButtonRow(
+                    title = "ZIP Operations",
+                    description = "Compress and decompress files",
+                    onRunTests = {
+                        scope.launch {
+                            val results = runZipOperations()
+                            operationResults = results + operationResults
+                        }
+                    }
+                )
+                
+                OperationButtonRow(
+                    title = "Clear Results",
+                    description = "Clear the operation results list",
+                    buttonText = "Clear",
+                    onRunTests = {
+                        operationResults = emptyList()
+                    }
+                )
+                
+                // Results
+                Text(
+                    "Operation Results",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                
+                operationResults.forEach { result ->
+                    OperationResultCard(result)
                 }
             }
         }
     }
 }
 
-private suspend fun runFileOperationsDemo(): List<OperationResult> {
+@Composable
+fun OperationButtonRow(
+    title: String,
+    description: String,
+    buttonText: String = "Run",
+    onRunTests: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = description,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Button(
+                onClick = onRunTests,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(buttonText)
+            }
+        }
+    }
+}
+
+// Basic file operations - Write, Read, Delete
+private fun runBasicFileOperations(): List<OperationResult> {
     val results = mutableListOf<OperationResult>()
     
     try {
-        // Set up test directory
-        val testDir = getFilesDirectory() / "okio-demo"
-        createDirectories(testDir)
-        results.add(OperationResult(
-            operation = "Create Directory", 
-            details = "Created directory: $testDir",
-            success = true
-        ))
-        
-        // Write a text file
-        val textFile = testDir / "sample.txt"
-        val textContent = "Hello from Okio Utils!\nThis is a sample text file."
-        writeToFile(textFile, textContent)
-        results.add(OperationResult(
-            operation = "Write Text File", 
-            details = "Wrote ${textContent.length} characters to $textFile",
-            success = true
-        ))
-        
-        // Read the text file
-        val readContent = readFromFile(textFile)
-        val readSuccess = readContent == textContent
-        results.add(OperationResult(
-            operation = "Read Text File", 
-            details = if (readSuccess) "Successfully read file content" else "Content mismatch",
-            success = readSuccess
-        ))
-        
-        // Write binary data
-        val binaryFile = testDir / "binary.data"
-        val binaryData = "Binary data with special chars: ÆØÅ".encodeUtf8()
-        writeToFile(binaryFile, binaryData)
-        results.add(OperationResult(
-            operation = "Write Binary File", 
-            details = "Wrote ${binaryData.size} bytes to $binaryFile",
-            success = true
-        ))
-        
-        // Read binary data
-        val readBinary = readBytesFromFile(binaryFile)
-        val binarySuccess = readBinary == binaryData
-        results.add(OperationResult(
-            operation = "Read Binary File", 
-            details = if (binarySuccess) "Successfully read binary content" else "Content mismatch",
-            success = binarySuccess
-        ))
-        
-        // List directory
-        val files = listDirectory(testDir)
-        results.add(OperationResult(
-            operation = "List Directory", 
-            details = "Found ${files.size} files: ${files.joinToString(", ") { it.name }}",
-            success = true
-        ))
-        
-        // Copy file
-        val copyFile = testDir / "sample-copy.txt"
-        copyFile(textFile, copyFile)
-        results.add(OperationResult(
-            operation = "Copy File", 
-            details = "Copied $textFile to $copyFile",
-            success = true
-            ))
-        
-        // Delete file
-        delete(textFile)
-        val deleteSuccess = !fileExists(textFile)
-        results.add(OperationResult(
-            operation = "Delete File", 
-            details = if (deleteSuccess) "Successfully deleted $textFile" else "Failed to delete file",
-            success = deleteSuccess
-        ))
-        
-        // Create ZIP file
-        val zipFile = getFilesDirectory() / "demo.zip"
-        compressToZip(testDir, zipFile)
-        results.add(OperationResult(
-            operation = "Create ZIP", 
-            details = "Created ZIP file at $zipFile",
-            success = true
-        ))
-        
-        // Extract ZIP file
-        val extractDir = getFilesDirectory() / "extracted"
-        createDirectories(extractDir)
-        decompressZip(zipFile, extractDir)
-        results.add(OperationResult(
-            operation = "Extract ZIP", 
-            details = "Extracted to $extractDir",
-            success = true
-        ))
-        
-        // Read content directly from ZIP (This demonstrates our new functionality)
-        try {
-            // We'll create a text file in a directory, zip it, and then read it directly
-            val contentDir = getFilesDirectory() / "content_for_zip"
-            createDirectories(contentDir)
-            
-            val contentFile = contentDir / "sample.txt"
-            val zipContent = "This content was read directly from a ZIP file!"
-            writeToFile(contentFile, zipContent)
-            
-            // Create a new ZIP file for this test
-            val contentZip = getFilesDirectory() / "content.zip"
-            compressToZip(contentDir, contentZip)
-            
-            // Use our new method to read directly from the ZIP
-            // In Android implementation, the file path may include content_for_zip/sample.txt
-            // Try with both paths to handle different implementations
-            val extractedContent = try {
-                // First try with just the filename
-                readStringFromZip(contentZip, "sample.txt")
-            } catch (e: Exception) {
-                try {
-                    // If that fails, try with the directory name included
-                    readStringFromZip(contentZip, "content_for_zip/sample.txt")
-                } catch (e2: Exception) {
-                    // If both fail, try reading the first file (using default behavior)
-                    readStringFromZip(contentZip)
-                }
-            }
-            
-            // Compare with original content
-            val contentMatches = extractedContent == zipContent
-            
-            results.add(OperationResult(
-                operation = "Read from ZIP", 
-                details = if (contentMatches) 
-                    "Successfully read content directly from ZIP" 
-                else 
-                    "Content read: $extractedContent",
-                success = contentMatches
-            ))
-            
-            // Clean up
-            delete(contentDir, recursively = true)
-            delete(contentZip)
-        } catch (e: Exception) {
-            results.add(OperationResult(
-                operation = "Read from ZIP", 
-                details = "Error: ${e.message}",
-                success = false
-            ))
+        // Create test directory
+        val cacheDir = getCacheDirectory()
+        val testDir = cacheDir / "okio-test"
+        val createDirResult = createDirectories(testDir)
+        if (createDirResult.isError) {
+            results.add(
+                OperationResult(
+                    operation = "Create Test Directory",
+                    details = "Failed to create directory: ${(createDirResult as FileResult.Error).exception.message}",
+                    success = false
+                )
+            )
+            return results
         }
         
+        // 1. Write text file
+        val textFile = testDir / "sample.txt"
+        val textContent = "Hello from Okio Utilities!"
+        val writeResult = writeToFile(textFile, textContent)
+        
+        results.add(
+            OperationResult(
+                operation = "Write Text File",
+                details = "Wrote text to $textFile",
+                success = writeResult.isSuccess
+            )
+        )
+        
+        // 2. Read text file
+        val readResult = readFromFile(textFile)
+        val readContent = readResult.getOrNull() ?: "Failed to read file"
+        
+        results.add(
+            OperationResult(
+                operation = "Read Text File",
+                details = "Content: $readContent",
+                success = readResult.isSuccess && readContent == textContent
+            )
+        )
+        
+        // 3. Write binary file
+        val binaryFile = testDir / "binary.dat"
+        val binaryData = "Binary data sample".encodeUtf8()
+        val writeBinaryResult = writeToFile(binaryFile, binaryData)
+        
+        results.add(
+            OperationResult(
+                operation = "Write Binary File",
+                details = "Wrote binary data to $binaryFile (${binaryData.size} bytes)",
+                success = writeBinaryResult.isSuccess
+            )
+        )
+        
+        // 4. Read binary file
+        val readBinaryResult = readBytesFromFile(binaryFile)
+        val binarySuccess = readBinaryResult.isSuccess && 
+                           readBinaryResult.getOrNull()?.utf8() == "Binary data sample"
+        
+        results.add(
+            OperationResult(
+                operation = "Read Binary File",
+                details = "Read ${readBinaryResult.getOrNull()?.size ?: 0} bytes",
+                success = binarySuccess
+            )
+        )
+        
     } catch (e: Exception) {
-        results.add(OperationResult(
-            operation = "Error", 
-            details = "Exception: ${e.message}",
-            success = false
-        ))
+        results.add(
+            OperationResult(
+                operation = "File Operations",
+                details = "Error: ${e.message}",
+                success = false
+            )
+        )
     }
     
     return results
+}
+
+// Directory operations - List, Copy, Delete
+private fun runDirectoryOperations(): List<OperationResult> {
+    val results = mutableListOf<OperationResult>()
+    
+    try {
+        // Create test directory
+        val cacheDir = getCacheDirectory()
+        val testDir = cacheDir / "okio-test"
+        val createDirResult = createDirectories(testDir)
+        if (createDirResult.isError) {
+            results.add(
+                OperationResult(
+                    operation = "Create Test Directory",
+                    details = "Failed to create directory: ${(createDirResult as FileResult.Error).exception.message}",
+                    success = false
+                )
+            )
+            return results
+        }
+        
+        // Create a sample file for operations
+        val textFile = testDir / "sample.txt"
+        val textContent = "This is a sample file for directory operations"
+        writeToFile(textFile, textContent)
+        
+        // List files in directory
+        val listResult = listDirectory(testDir)
+        val files = listResult.getOrNull() ?: emptyList()
+        
+        results.add(
+            OperationResult(
+                operation = "List Directory",
+                details = "Found ${files.size} files in $testDir",
+                success = listResult.isSuccess
+            )
+        )
+        
+        // Copy file
+        val copyFile = testDir / "sample-copy.txt"
+        val copyResult = copyFile(textFile, copyFile)
+        
+        results.add(
+            OperationResult(
+                operation = "Copy File",
+                details = "Copied $textFile to $copyFile",
+                success = copyResult.isSuccess
+            )
+        )
+        
+        // Delete file
+        val deleteResult = delete(textFile)
+        val deleteSuccess = deleteResult.isSuccess && !fileExists(textFile)
+        
+        results.add(
+            OperationResult(
+                operation = "Delete File",
+                details = if (deleteSuccess) "Successfully deleted $textFile" else "Failed to delete file",
+                success = deleteSuccess
+            )
+        )
+        
+    } catch (e: Exception) {
+        results.add(
+            OperationResult(
+                operation = "Directory Operations",
+                details = "Error: ${e.message}",
+                success = false
+            )
+        )
+    }
+    
+    return results
+}
+
+// ZIP operations - Compress and decompress
+private fun runZipOperations(): List<OperationResult> {
+    val results = mutableListOf<OperationResult>()
+    
+    try {
+        // Create test directory with content
+        val cacheDir = getCacheDirectory()
+        val contentDir = cacheDir / "zip-content"
+        val createDirResult = createDirectories(contentDir)
+        if (createDirResult.isError) {
+            results.add(
+                OperationResult(
+                    operation = "Create Content Directory",
+                    details = "Failed to create directory: ${(createDirResult as FileResult.Error).exception.message}",
+                    success = false
+                )
+            )
+            return results
+        }
+        
+        // Create files in the content directory
+        val contentFile = contentDir / "text-file.txt"
+        val zipContent = "This content will be compressed into a ZIP file."
+        val writeResult = writeToFile(contentFile, zipContent)
+        if (writeResult.isError) {
+            results.add(
+                OperationResult(
+                    operation = "Create Content File",
+                    details = "Failed to create content file: ${(writeResult as FileResult.Error).exception.message}",
+                    success = false
+                )
+            )
+            return results
+        }
+        
+        // Compress the directory
+        val contentZip = cacheDir / "content.zip"
+        val compressResult = compressToZip(contentDir, contentZip)
+        
+        results.add(
+            OperationResult(
+                operation = "Compress to ZIP",
+                details = "Compressed $contentDir to $contentZip",
+                success = compressResult.isSuccess && fileExists(contentZip)
+            )
+        )
+        
+        // Decompress the ZIP
+        val extractDir = cacheDir / "extracted"
+        val decompressResult = decompressZip(contentZip, extractDir)
+        
+        results.add(
+            OperationResult(
+                operation = "Decompress ZIP",
+                details = "Extracted $contentZip to $extractDir",
+                success = decompressResult.isSuccess && fileExists(extractDir)
+            )
+        )
+        
+        // Read directly from ZIP
+        val readZipResult = readStringFromZip(contentZip, "text-file.txt")
+        val zipReadSuccess = readZipResult.isSuccess && 
+                           readZipResult.getOrNull() == zipContent
+        
+        results.add(
+            OperationResult(
+                operation = "Read from ZIP",
+                details = "Content from ZIP: ${readZipResult.getOrNull() ?: "Failed to read"}",
+                success = zipReadSuccess
+            )
+        )
+        
+        // Clean up
+        delete(contentDir, recursively = true)
+        delete(contentZip)
+        delete(extractDir, recursively = true)
+        
+    } catch (e: Exception) {
+        results.add(
+            OperationResult(
+                operation = "ZIP Operations",
+                details = "Error: ${e.message}",
+                success = false
+            )
+        )
+    }
+    
+    return results
+}
+
+@Composable
+fun OperationResultCard(result: OperationResult) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        elevation = 2.dp,
+        backgroundColor = if (result.success) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = if (result.success) Icons.Default.Check else Icons.Default.Close,
+                contentDescription = if (result.success) "Success" else "Failure",
+                tint = if (result.success) Color(0xFF4CAF50) else Color(0xFFF44336)
+            )
+            
+            Column {
+                Text(
+                    text = result.operation,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = result.details,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
 }
 
 data class OperationResult(

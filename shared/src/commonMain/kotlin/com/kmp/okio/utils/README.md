@@ -1,121 +1,211 @@
-# OkioUtils
+# OkioUtils - Kotlin Multiplatform
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%20|%20iOS-lightgrey.svg)](https://kotlinlang.org/docs/multiplatform.html)
 
-A Kotlin Multiplatform library providing cross-platform file operations, serialization utilities, and ZIP functionality using Square's [Okio](https://square.github.io/okio/) library.
+A Kotlin Multiplatform (KMP) library providing cross-platform file operations, serialization utilities, and ZIP functionality using Square's [Okio](https://square.github.io/okio/) library.
 
 ## Features
 
-- **Cross-Platform File Operations**: Read, write, copy, delete, and list files with a consistent API
-- **Platform-Specific Directory Access**: Get cache, files, and temp directories on iOS and Android
-- **Serialization Utilities**: Easily serialize strings, lists, maps, and binary data
-- **ZIP Functionality**: Compress and decompress files with the same API on all platforms
-- **Modern Architecture**: Interface-based design with clean separation of platform-specific code
+- **File Operations**: Read, write, copy, delete files with a simple API
+- **Directory Operations**: Create, list, and traverse directories
+- **ZIP Functionality**: Compress and decompress files/directories
+- **Serialization Utilities**: Easily serialize and deserialize data structures
+- **Cross-Platform**: Runs on Android and iOS with the same API
+- **Error Handling**: Modern result-based API that doesn't throw exceptions
 
-## Installation
+## Project Structure
+
+- **FileOperations.kt**: Common file system operations (read, write, copy, etc.)
+- **OkioUtils.kt**: Serialization utilities and ZIP operations
+- **PlatformFile.kt**: Cross-platform interface for platform-specific operations
+- Platform-specific implementations for Android and iOS
+
+## Setup
 
 ### Gradle
 
-Add the dependency to your module's `build.gradle.kts` file:
+Add the dependency to your build.gradle.kts file:
 
 ```kotlin
-repositories {
-    mavenCentral()
+dependencies {
+    implementation("com.kmp.okio:shared:1.0.0")
 }
+```
 
-// For common code
-kotlin {
-    sourceSets {
-        commonMain {
-            dependencies {
-                implementation("com.kmp.okio:okio-utils:1.0.0")
-            }
-        }
+### Android Setup
+
+Initialize the app context in your Application class:
+
+```kotlin
+import com.kmp.okio.utils.initialize
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        initialize(this) // Initialize with application context
     }
 }
-
-// For JVM/Android only
-dependencies {
-    implementation("com.kmp.okio:okio-utils-android:1.0.0")
-}
 ```
 
-### Cocoapods
+### iOS Integration
 
-Add the pod to your `Podfile`:
+No additional setup is needed for iOS. The library automatically uses platform APIs for directory access. ZIP functionality is implemented using SSZipArchive.
 
-```ruby
-pod 'OkioUtils', '~> 1.0.0'
-```
+## Usage Examples
 
-## Usage
-
-### File Operations
+### Basic File Operations with Result Handling
 
 ```kotlin
-val file = FileSystem.SYSTEM.getPath("/path/to/file")
+import com.kmp.okio.utils.*
+import okio.Path.Companion.toPath
 
-// Read file
-val content = file.readText()
+// Writing to a file
+val filePath = getFilesDirectory() / "myfile.txt"
+val writeResult = writeToFile(filePath, "Hello, World!")
 
-// Write file
-file.writeText("Hello, World!")
+if (writeResult.isSuccess) {
+    println("File written successfully")
+} else {
+    println("Failed to write file: ${(writeResult as FileResult.Error).exception.message}")
+}
 
-// Copy file
-val destination = FileSystem.SYSTEM.getPath("/path/to/destination")
-file.copyTo(destination)
+// Reading from a file - using getOrNull() for nullable result
+val content = readFromFile(filePath).getOrNull()
+if (content != null) {
+    println("Content: $content")
+} else {
+    println("Failed to read file")
+}
 
-// Delete file
-file.delete()
+// Reading from a file - using getOrThrow() to handle errors with try/catch
+try {
+    val content = readFromFile(filePath).getOrThrow()
+    println("Content: $content")
+} catch (e: Exception) {
+    println("Failed to read file: ${e.message}")
+}
 
-// List files in a directory
-val directory = FileSystem.SYSTEM.getPath("/path/to/directory")
-val files = directory.listFiles()
+// You can also use Kotlin's when expression for clear control flow
+when (val result = readFromFile(filePath)) {
+    is FileResult.Success -> println("Content: ${result.value}")
+    is FileResult.Error -> println("Error: ${result.exception.message}")
+}
+
+// Copying files
+val destination = getCacheDirectory() / "myfile_copy.txt"
+copyFile(filePath, destination)
+
+// Listing directory contents
+val filesResult = listDirectory(getFilesDirectory())
+filesResult.getOrNull()?.forEach { println(it) }
+
+// Deleting files
+delete(filePath)
 ```
 
 ### Serialization Utilities
 
 ```kotlin
-val data = mapOf("key" to "value")
+import com.kmp.okio.utils.*
+import okio.buffer
+import okio.sink
+import okio.source
 
-// Serialize to JSON
-val json = data.toJson()
+// Example with BufferedSink/BufferedSource
+val filePath = getFilesDirectory() / "data.bin"
 
-// Deserialize from JSON
-val deserializedData = json.fromJson<Map<String, String>>()
+// Writing data
+fileSystem.sink(filePath).buffer().use { sink ->
+    sink.writePrefixedString("Hello")
+    sink.writeStringList(listOf("item1", "item2", "item3"))
+    sink.writeStringMap(mapOf("key1" to "value1", "key2" to "value2"))
+}
+
+// Reading data
+fileSystem.source(filePath).buffer().use { source ->
+    try {
+        val str = source.readPrefixedString()
+        val list = source.readStringList()
+        val map = source.readStringMap()
+        
+        println("String: $str")
+        println("List: $list")
+        println("Map: $map")
+    } catch (e: SerializationException) {
+        println("Failed to deserialize: ${e.message}")
+    }
+}
 ```
 
-### ZIP Functionality
+### ZIP Operations
 
 ```kotlin
-val source = FileSystem.SYSTEM.getPath("/path/to/source")
-val destination = FileSystem.SYSTEM.getPath("/path/to/destination")
+import com.kmp.okio.utils.*
+import okio.Path.Companion.toPath
 
-// Compress file or directory
-source.compress(destination)
+// Compressing files/directories
+val sourceDir = getFilesDirectory() / "documents"
+val zipFile = getCacheDirectory() / "documents.zip"
 
-// Decompress file
-destination.decompress(source)
+val compressResult = compressToZip(sourceDir, zipFile)
+if (compressResult.isSuccess) {
+    println("Compression successful")
+} else {
+    println("Compression failed: ${(compressResult as FileResult.Error).exception.message}")
+}
+
+// Decompressing ZIP files
+val extractPath = getFilesDirectory() / "extracted"
+val extractResult = decompressZip(zipFile, extractPath)
+
+if (extractResult.isSuccess) {
+    println("Extraction successful")
+} else {
+    println("Extraction failed: ${(extractResult as FileResult.Error).exception.message}")
+}
+
+// Reading content directly from a ZIP file
+val contentResult = readStringFromZip(zipFile, "document.txt")
+val content = contentResult.getOrNull() ?: "Failed to read from ZIP"
+println(content)
 ```
 
-## API Documentation
+## Error Handling
 
-For detailed API documentation, please refer to the [KDoc](https://kotlinlang.org/docs/kotlin-doc.html) comments in the source code.
+This library uses a Result-based approach to handle errors instead of throwing exceptions. All operations that can fail return a `FileResult<T>` which is either a `Success` with a value or an `Error` with an exception.
 
-## Platform-Specific Details
+```kotlin
+sealed class FileResult<out T> {
+    data class Success<T>(val value: T) : FileResult<T>()
+    data class Error(val exception: Exception) : FileResult<Nothing>()
+    
+    fun getOrNull(): T? = when (this) {
+        is Success -> value
+        is Error -> null
+    }
+    
+    fun getOrThrow(): T = when (this) {
+        is Success -> value
+        is Error -> throw exception
+    }
+    
+    val isSuccess: Boolean get() = this is Success
+    val isError: Boolean get() = this is Error
+}
+```
 
-- **Android**: Uses Android Context for directory access and Java's `java.util.zip` for compression
-- **iOS**: Uses NSSearchPathForDirectoriesInDomains for directory access and a bridge to native iOS code for compression
+This allows for more explicit error handling without try/catch blocks, making your code cleaner and more predictable.
 
-## Contributing
+## Platform-Specific Behavior
 
-Contributions are welcome! Please follow the [Contributing Guidelines](CONTRIBUTING.md) for more information.
+- **Android**: Uses Context to access app-specific directories
+- **iOS**: Uses NSSearchPathForDirectoriesInDomains and NSTemporaryDirectory for directory access
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This library is licensed under the MIT License - see the LICENSE file for details.
 
 # OkioUtils Structure and KMM Best Practices
 

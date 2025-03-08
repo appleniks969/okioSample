@@ -5,14 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.kmp.okio.utils.appContext
+import com.kmp.okio.utils.initialize
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         // Initialize app context for Okio utilities
-        appContext = applicationContext
+        initialize(applicationContext)
 
         setContent {
             App()
