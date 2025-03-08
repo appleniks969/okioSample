@@ -70,6 +70,12 @@ compressToZip(sourceDir, zipFile)
 // Extracting a ZIP file
 val extractDir = getFilesDirectory() / "extracted"
 decompressZip(zipFile, extractDir)
+
+// Extract and read string content directly from a ZIP file
+val content = readStringFromZip(zipFile, filePathInZip = "data/sample.txt")
+
+// Extract and read the first file in the ZIP
+val firstFileContent = readStringFromZip(zipFile)
 ```
 
 ### Serialization Utilities

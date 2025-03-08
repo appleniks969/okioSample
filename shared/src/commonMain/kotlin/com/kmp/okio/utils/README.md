@@ -116,3 +116,104 @@ Contributions are welcome! Please follow the [Contributing Guidelines](CONTRIBUT
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+# OkioUtils Structure and KMM Best Practices
+
+This package contains utilities for using Okio in a Kotlin Multiplatform project. The code has been structured according to KMM best practices to ensure proper separation of concerns and platform-specific implementations.
+
+## Architecture
+
+### Interface-based Platform Implementation
+
+We've adopted an interface-based approach for platform-specific functionality:
+
+1. **PlatformFile Interface**: Defines the contract for platform-specific file operations
+   - Provides consistent API across platforms
+   - Makes platform-specific requirements explicit
+
+2. **AndroidPlatformFile**: Implements the interface for Android
+   - Uses Android Context for directory access
+   - Implements compression using java.util.zip
+
+3. **IosPlatformFile**: Implements the interface for iOS
+   - Uses NSSearchPathForDirectoriesInDomains for directory access
+   - Implements compression using a bridge to native iOS code
+
+### Pure Kotlin Common Code
+
+1. **FileOperations.kt**: Platform-agnostic file operations
+   - Read, write, copy, list, and delete files
+   - Works with the abstract FileSystem from Okio
+   - Includes ZIP extraction and reading utilities
+
+2. **OkioUtils.kt**: Serialization utilities and platform-independent API
+   - Extension functions for BufferedSink and BufferedSource
+   - Delegates to platform-specific implementations where needed
+
+## Key Features
+
+### File Operations
+```kotlin
+// Basic operations
+writeToFile(path, "Hello World")
+val content = readFromFile(path)
+delete(path)
+
+// Directory operations
+createDirectories(path)
+val files = listDirectory(path)
+
+// Copying files
+copyFile(source, destination)
+```
+
+### ZIP Operations
+```kotlin
+// Compress files or directories
+compressToZip(source, destination)
+
+// Extract ZIP files
+decompressZip(zipFile, extractDir)
+
+// Extract and read content directly from ZIP
+val content = readStringFromZip(zipFile, "path/to/file/in/zip.txt")
+```
+
+### Serialization
+```kotlin
+// Write data
+buffer.writePrefixedString("Hello")
+buffer.writeStringList(listOf("a", "b", "c"))
+buffer.writeStringMap(mapOf("key" to "value"))
+
+// Read data
+val string = buffer.readPrefixedString()
+val list = buffer.readStringList()
+val map = buffer.readStringMap()
+```
+
+## KMM Best Practices Applied
+
+1. **Consistent Error Handling**
+   - Transformed platform-specific exceptions to generic exceptions
+   - Provides helpful context in error messages
+
+2. **Dependency Injection**
+   - Platform-specific implementations are provided via singletons
+   - Makes testing easier with mock implementations
+
+3. **Improved Testability**
+   - FakeFileSystem for testing file operations
+   - Mock implementations for platform-specific code
+
+4. **Clear API Boundaries**
+   - Separated serialization from file operations
+   - Platform-specific code is well-encapsulated
+
+5. **Documentation**
+   - KDoc comments for all public APIs
+   - Clear explanations of functionality and error conditions
+
+6. **Simplified Usage**
+   - Top-level functions for common operations
+   - Type-safe Builder pattern via Kotlin extension functions

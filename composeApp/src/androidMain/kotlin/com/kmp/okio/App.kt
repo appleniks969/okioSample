@@ -248,6 +248,59 @@ private suspend fun runFileOperationsDemo(): List<OperationResult> {
             success = true
         ))
         
+        // Read content directly from ZIP (This demonstrates our new functionality)
+        try {
+            // We'll create a text file in a directory, zip it, and then read it directly
+            val contentDir = getFilesDirectory() / "content_for_zip"
+            createDirectories(contentDir)
+            
+            val contentFile = contentDir / "sample.txt"
+            val zipContent = "This content was read directly from a ZIP file!"
+            writeToFile(contentFile, zipContent)
+            
+            // Create a new ZIP file for this test
+            val contentZip = getFilesDirectory() / "content.zip"
+            compressToZip(contentDir, contentZip)
+            
+            // Use our new method to read directly from the ZIP
+            // In Android implementation, the file path may include content_for_zip/sample.txt
+            // Try with both paths to handle different implementations
+            val extractedContent = try {
+                // First try with just the filename
+                readStringFromZip(contentZip, "sample.txt")
+            } catch (e: Exception) {
+                try {
+                    // If that fails, try with the directory name included
+                    readStringFromZip(contentZip, "content_for_zip/sample.txt")
+                } catch (e2: Exception) {
+                    // If both fail, try reading the first file (using default behavior)
+                    readStringFromZip(contentZip)
+                }
+            }
+            
+            // Compare with original content
+            val contentMatches = extractedContent == zipContent
+            
+            results.add(OperationResult(
+                operation = "Read from ZIP", 
+                details = if (contentMatches) 
+                    "Successfully read content directly from ZIP" 
+                else 
+                    "Content read: $extractedContent",
+                success = contentMatches
+            ))
+            
+            // Clean up
+            delete(contentDir, recursively = true)
+            delete(contentZip)
+        } catch (e: Exception) {
+            results.add(OperationResult(
+                operation = "Read from ZIP", 
+                details = "Error: ${e.message}",
+                success = false
+            ))
+        }
+        
     } catch (e: Exception) {
         results.add(OperationResult(
             operation = "Error", 

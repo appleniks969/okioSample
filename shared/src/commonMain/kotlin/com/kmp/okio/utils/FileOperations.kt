@@ -3,6 +3,7 @@ package com.kmp.okio.utils
 import okio.ByteString
 import okio.FileSystem
 import okio.Path
+import kotlin.random.Random
 
 // ==================== File System Operations ====================
 
@@ -155,4 +156,91 @@ fun listDirectory(directory: Path): List<Path> {
     }
     
     return fileSystem.list(directory)
+}
+
+/**
+ * Extracts a ZIP file and reads the string content from a file within it.
+ * 
+ * @param zipPath The path to the ZIP file to extract.
+ * @param filePathInZip The relative path to the file within the ZIP to read (optional).
+ *                     If null, the first file in the extracted directory will be read.
+ *                     If specified but not found, the function will try to search for the file by name only.
+ * @param deleteAfterReading Whether to delete the extracted files after reading (default: true).
+ * @return The string content of the file from the ZIP.
+ * @throws Exception If the ZIP file doesn't exist, extraction fails, or the specified file cannot be found.
+ */
+fun readStringFromZip(zipPath: Path, filePathInZip: String? = null, deleteAfterReading: Boolean = true): String {
+    if (!fileExists(zipPath)) {
+        throw Exception("ZIP file does not exist: $zipPath")
+    }
+    
+    // Create a temporary directory for extraction with a random identifier
+    val randomId = Random.nextInt(100000, 999999)
+    val extractDir = getTempDirectory() / "extract_$randomId"
+    try {
+        // Create the temporary directory
+        createDirectories(extractDir)
+        
+        // Extract the ZIP file
+        decompressZip(zipPath, extractDir)
+        
+        // Find the file to read
+        val fileToRead = if (filePathInZip != null) {
+            // First try the exact specified path
+            val exactPath = extractDir / filePathInZip
+            if (fileExists(exactPath)) {
+                exactPath
+            } else {
+                // If not found, try to find the file by name anywhere in the extracted directory
+                val fileName = filePathInZip.substringAfterLast('/')
+                val allFiles = findAllFiles(extractDir)
+                val matchingFile = allFiles.find { it.name == fileName }
+                
+                if (matchingFile != null) {
+                    matchingFile
+                } else {
+                    throw Exception("File '$filePathInZip' not found in the ZIP archive")
+                }
+            }
+        } else {
+            // Find the first file in the extracted directory
+            val allFiles = findAllFiles(extractDir)
+            if (allFiles.isEmpty()) {
+                throw Exception("No files found in the ZIP archive")
+            }
+            allFiles.first()
+        }
+        
+        // Read the file content
+        return readFromFile(fileToRead)
+    } finally {
+        // Clean up if requested
+        if (deleteAfterReading) {
+            delete(extractDir, recursively = true)
+        }
+    }
+}
+
+/**
+ * Recursively finds all files (not directories) within a directory.
+ * 
+ * @param directory The directory to search.
+ * @return A list of paths to all files found.
+ */
+private fun findAllFiles(directory: Path): List<Path> {
+    if (!fileExists(directory) || !fileSystem.metadata(directory).isDirectory) {
+        return emptyList()
+    }
+    
+    val result = mutableListOf<Path>()
+    for (path in listDirectory(directory)) {
+        val metadata = fileSystem.metadata(path)
+        if (metadata.isDirectory) {
+            result.addAll(findAllFiles(path))
+        } else {
+            result.add(path)
+        }
+    }
+    
+    return result
 } 
