@@ -45,6 +45,7 @@ fun writeToFile(path: Path, byteString: ByteString, createParentDirectories: Boo
  *
  * @param path The path to the file.
  * @return The string content of the file.
+ * @throws Exception If the file does not exist.
  */
 fun readFromFile(path: Path): String {
     if (!fileSystem.exists(path)) {
@@ -61,6 +62,7 @@ fun readFromFile(path: Path): String {
  *
  * @param path The path to the file.
  * @return The binary content of the file.
+ * @throws Exception If the file does not exist.
  */
 fun readBytesFromFile(path: Path): ByteString {
     if (!fileSystem.exists(path)) {
@@ -109,6 +111,7 @@ fun delete(path: Path, recursively: Boolean = false) {
  * @param source The path to the source file.
  * @param destination The path to the destination file.
  * @param createParentDirectories Whether to create parent directories for the destination.
+ * @throws Exception If the source file doesn't exist or is a directory.
  */
 fun copyFile(source: Path, destination: Path, createParentDirectories: Boolean = true) {
     if (!fileSystem.exists(source)) {
@@ -140,6 +143,7 @@ fun createDirectories(path: Path) {
  *
  * @param directory The directory to list.
  * @return A list of paths for all entries in the directory.
+ * @throws Exception If the directory doesn't exist or is not a directory.
  */
 fun listDirectory(directory: Path): List<Path> {
     if (!fileSystem.exists(directory)) {
@@ -151,22 +155,4 @@ fun listDirectory(directory: Path): List<Path> {
     }
     
     return fileSystem.list(directory)
-}
-
-// ==================== ZIP Operations ====================
-
-/**
- * Compresses the file or directory at [source] into a zip file at [zipPath].
- *
- * @param source The path to the file or directory to compress.
- * @param zipPath The path where the zip file will be created.
- */
-expect fun compressToZip(source: Path, zipPath: Path)
-
-/**
- * Decompresses the zip file at [zipPath] to the directory at [destination].
- *
- * @param zipPath The path to the zip file to decompress.
- * @param destination The directory where the contents will be extracted.
- */
-expect fun decompressZip(zipPath: Path, destination: Path) 
+} 

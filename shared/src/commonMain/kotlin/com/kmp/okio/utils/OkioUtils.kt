@@ -20,22 +20,39 @@ import okio.IOException
 /**
  * Provides the platform-specific [FileSystem] instance.
  */
-expect val fileSystem: FileSystem
+val fileSystem: FileSystem get() = PlatformFileManager.fileSystem
 
 /**
  * Returns the platform-specific cache directory path.
  */
-expect fun getCacheDirectory(): Path
+fun getCacheDirectory(): Path = PlatformFileManager.getCacheDirectory()
 
 /**
  * Returns the platform-specific files/documents directory path.
  */
-expect fun getFilesDirectory(): Path
+fun getFilesDirectory(): Path = PlatformFileManager.getFilesDirectory()
 
 /**
  * Returns a platform-specific temporary directory path.
  */
-expect fun getTempDirectory(): Path
+fun getTempDirectory(): Path = PlatformFileManager.getTempDirectory()
+
+// ZIP Operations
+/**
+ * Compresses the file or directory at [source] into a zip file at [zipPath].
+ *
+ * @param source The path to the file or directory to compress.
+ * @param zipPath The path where the zip file will be created.
+ */
+fun compressToZip(source: Path, zipPath: Path) = PlatformFileManager.compressToZip(source, zipPath)
+
+/**
+ * Decompresses the zip file at [zipPath] to the directory at [destination].
+ *
+ * @param zipPath The path to the zip file to decompress.
+ * @param destination The directory where the contents will be extracted.
+ */
+fun decompressZip(zipPath: Path, destination: Path) = PlatformFileManager.decompressZip(zipPath, destination)
 
 // ==================== Serialization Utilities ====================
 

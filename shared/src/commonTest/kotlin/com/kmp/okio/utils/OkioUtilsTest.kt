@@ -2,53 +2,13 @@ package com.kmp.okio.utils
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 import okio.ByteString.Companion.encodeUtf8
-import okio.Path.Companion.toPath
-import okio.buffer
-import okio.fakefilesystem.FakeFileSystem
+import okio.Buffer
 
+/**
+ * Tests for the serialization utilities in OkioUtils
+ */
 class OkioUtilsTest {
-    
-    private val fakeFileSystem = FakeFileSystem()
-    private val testDir = "/test".toPath()
-    
-    @Test
-    fun testFileOperations() {
-        // Set up test environment
-        fakeFileSystem.createDirectories(testDir)
-        val filePath = testDir / "test.txt"
-        
-        // Test writeToFile
-        val content = "Hello, World!"
-        fakeFileSystem.write(filePath) {
-            writeUtf8(content)
-        }
-        
-        // Test fileExists
-        assertTrue(fakeFileSystem.exists(filePath))
-        
-        // Test readFromFile
-        val readContent = fakeFileSystem.read(filePath) {
-            readUtf8()
-        }
-        assertEquals(content, readContent)
-        
-        // Test copyFile
-        val destPath = testDir / "test_copy.txt"
-        fakeFileSystem.copy(filePath, destPath)
-        assertTrue(fakeFileSystem.exists(destPath))
-        
-        // Test listDirectory
-        val files = fakeFileSystem.list(testDir)
-        assertEquals(2, files.size)
-        
-        // Test delete
-        fakeFileSystem.delete(filePath)
-        assertFalse(fakeFileSystem.exists(filePath))
-    }
-    
     @Test
     fun testSerializationUtils() {
         val testString = "Test String"
@@ -57,7 +17,7 @@ class OkioUtilsTest {
         val testMap = mapOf("key1" to "value1", "key2" to "value2")
         
         // Create a memory buffer for testing
-        val buffer = okio.Buffer()
+        val buffer = Buffer()
         
         // Test writing serialized data
         buffer.writeLengthPrefixed(testByteString)

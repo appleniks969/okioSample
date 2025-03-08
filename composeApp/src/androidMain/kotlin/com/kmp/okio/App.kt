@@ -218,7 +218,7 @@ private suspend fun runFileOperationsDemo(): List<OperationResult> {
             operation = "Copy File", 
             details = "Copied $textFile to $copyFile",
             success = true
-        ))
+            ))
         
         // Delete file
         delete(textFile)
